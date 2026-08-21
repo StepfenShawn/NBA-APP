@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nba_app/api/api_service.dart';
 import 'package:nba_app/models/team.dart';
+import 'package:nba_app/pages/player_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -29,7 +30,8 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   List<Team> _teams = [];
   bool _isLoading = true;
   String? _errorMsg;
@@ -37,13 +39,14 @@ class _MyHomePageState extends State<MyHomePage> {
   final ApiService _apiService = ApiService();
 
   Future<void> _loadTeams() async {
+    final conference = _tabController.index == 0 ? Conference.east : Conference.west;
     setState(() {
       _isLoading = true;
       _errorMsg = null;
     });
 
     try {
-      List<Team> teams = await _apiService.fetchTeams();
+      List<Team> teams = await _apiService.fetchTeams(conference);
       setState(() {
         _teams = teams;
         _isLoading = false;
@@ -59,7 +62,19 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        _loadTeams();
+      }
+    });
     _loadTeams();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    _tabController.dispose();
   }
 
   @override
@@ -68,8 +83,15 @@ class _MyHomePageState extends State<MyHomePage> {
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: [
+            Tab(text: "East"),
+            Tab(text: "West"),
+          ],
+        ),
       ),
-      body: Center(child: _buildBody()),
+      body: TabBarView(controller: _tabController, children: [_buildBody(), _buildBody()]),
     );
   }
 
@@ -99,6 +121,14 @@ class _MyHomePageState extends State<MyHomePage> {
             title: Text(team.fullName),
             subtitle: Text(team.city),
             trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PlayerListPage(teamId: team.id, teamName: team.fullName),
+                ),
+              );
+            },
           );
         },
       );
